@@ -34,6 +34,7 @@ public class Main extends WebSocketServer {
     private Map<String, JSONObject> clientMousePositions = new HashMap<>();
 
     private static Map<String, JSONObject> selectableObjects = new HashMap<>();
+    private static Map<String, JSONObject> selectableObjects2 = new HashMap<>();
 
     public Main(InetSocketAddress address) {
         super(address);
@@ -69,7 +70,32 @@ public class Main extends WebSocketServer {
         availableNames.add(clientName);
         System.out.println("WebSocket client disconnected: " + clientName);
         sendClientsList();
+    
+        // Si no quedan clientes conectados, restablece posiciones de los barcos
+        if (clients.isEmpty()) {
+            resetShipPositions();
+        }
     }
+    
+    private static final Map<String, JSONObject> initialSelectableObjects = new HashMap<>();
+    private static final Map<String, JSONObject> initialSelectableObjects2 = new HashMap<>();
+
+    private void resetShipPositions() {
+        // Restablece el estado de `selectableObjects` a su posición inicial
+        selectableObjects.clear();
+        for (String objectId : initialSelectableObjects.keySet()) {
+            selectableObjects.put(objectId, new JSONObject(initialSelectableObjects.get(objectId).toString()));
+        }
+        // Restablece el estado de `selectableObjects2` a su posición inicial
+        selectableObjects2.clear();
+        for (String objectId : initialSelectableObjects2.keySet()) {
+            selectableObjects2.put(objectId, new JSONObject(initialSelectableObjects2.get(objectId).toString()));
+        }
+    
+        // Enviar actualización a los clientes
+        sendServerSelectableObjects();
+    }
+    
 
     @Override
     public void onMessage(WebSocket conn, String message) {
@@ -213,14 +239,26 @@ public class Main extends WebSocketServer {
     }
 
     public void sendServerSelectableObjects() {
-
-        // Prepara el missatge de tipus 'serverObjects' amb les posicions de tots els clients
-        JSONObject rst1 = new JSONObject();
-        rst1.put("type", "serverSelectableObjects");
-        rst1.put("selectableObjects", selectableObjects);
-
-        // Envia el missatge a tots els clients connectats
-        broadcastMessage(rst1.toString(), null);
+        for (Map.Entry<WebSocket, String> entry : clients.entrySet()) {
+            WebSocket conn = entry.getKey();
+            String clientId = entry.getValue();
+    
+            // Crear el mensaje para enviar solo los objetos del cliente correspondiente
+            JSONObject rst = new JSONObject();
+            rst.put("type", "serverSelectableObjects");
+    
+            if (clientId.equals("A")) {
+                rst.put("selectableObjects", selectableObjects);  // Barcos del jugador A
+            } else if (clientId.equals("B")) {
+                rst.put("selectableObjects", selectableObjects2); // Barcos del jugador B
+            }
+    
+            try {
+                conn.send(rst.toString());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
    
     @Override
@@ -269,42 +307,127 @@ public class Main extends WebSocketServer {
         LineReader reader = LineReaderBuilder.builder().build();
         System.out.println("Server running. Type 'exit' to gracefully stop it.");
 
-        // Add objects
+        // Add objects Player1
         String name0 = "O0";
         JSONObject obj0 = new JSONObject();
         obj0.put("objectId", name0);
         obj0.put("x", 300);
         obj0.put("y", 50);
+        obj0.put("initialX", 300);
+        obj0.put("initialY", 50);
         obj0.put("cols", 4);
         obj0.put("rows", 1);
         selectableObjects.put(name0, obj0);
+        initialSelectableObjects.put("O0", obj0);
 
         String name1 = "O1";
         JSONObject obj1 = new JSONObject();
         obj1.put("objectId", name1);
         obj1.put("x", 300);
         obj1.put("y", 100);
+        obj1.put("initialX", 300);
+        obj1.put("initialY", 100);
         obj1.put("cols", 3);
         obj1.put("rows", 1);
         selectableObjects.put(name1, obj1);
+        initialSelectableObjects.put("O1", obj1);
 
         String name2 = "O2";
         JSONObject obj2 = new JSONObject();
         obj2.put("objectId", name2);
         obj2.put("x", 300);
         obj2.put("y", 150);
+        obj2.put("initialX", 300);
+        obj2.put("initialY", 150);
         obj2.put("cols", 1);
-        obj2.put("rows", 3);
+        obj2.put("rows", 2);
         selectableObjects.put(name2, obj2);
+        initialSelectableObjects.put("O2", obj2);
 
         String name3 = "O3";
         JSONObject obj3 = new JSONObject();
         obj3.put("objectId", name3);
-        obj3.put("x", 300);
-        obj3.put("y", 200);
+        obj3.put("x", 350);
+        obj3.put("y", 150);
+        obj3.put("initialX", 350);
+        obj3.put("initialY", 150);
         obj3.put("cols", 1);
-        obj3.put("rows", 2);
+        obj3.put("rows", 3);
         selectableObjects.put(name3, obj3);
+        initialSelectableObjects.put("O3", obj3);
+
+        String name4 = "O4";
+        JSONObject obj4 = new JSONObject();
+        obj4.put("objectId", name4);
+        obj4.put("x", 400);
+        obj4.put("y", 150);
+        obj4.put("initialX", 400);
+        obj4.put("initialY", 150);
+        obj4.put("cols", 1);
+        obj4.put("rows", 5);
+        selectableObjects.put(name4, obj4);
+        initialSelectableObjects.put("O4", obj4);
+
+        // Add objects Player2
+        String name5 = "O5";
+        JSONObject obj5 = new JSONObject();
+        obj5.put("objectId", name5);
+        obj5.put("x", 300);
+        obj5.put("y", 50);
+        obj5.put("initialX", 300);
+        obj5.put("initialY", 50);
+        obj5.put("cols", 4);
+        obj5.put("rows", 1);
+        selectableObjects2.put(name5, obj5);
+        initialSelectableObjects2.put("O5", obj5);
+
+        String name6 = "O6";
+        JSONObject obj6 = new JSONObject();
+        obj6.put("objectId", name6);
+        obj6.put("x", 300);
+        obj6.put("y", 100);
+        obj6.put("initialX", 300);
+        obj6.put("initialY", 100);
+        obj6.put("cols", 3);
+        obj6.put("rows", 1);
+        selectableObjects2.put(name6, obj6);
+        initialSelectableObjects2.put("O6", obj6);
+
+        String name7 = "O7";
+        JSONObject obj7 = new JSONObject();
+        obj7.put("objectId", name7);
+        obj7.put("x", 300);
+        obj7.put("y", 150);
+        obj7.put("initialX", 300);
+        obj7.put("initialY", 150);
+        obj7.put("cols", 1);
+        obj7.put("rows", 2);
+        selectableObjects2.put(name7, obj7);
+        initialSelectableObjects2.put("O7", obj7);
+
+        String name8 = "O8";
+        JSONObject obj8 = new JSONObject();
+        obj8.put("objectId", name8);
+        obj8.put("x", 350);
+        obj8.put("y", 150);
+        obj8.put("initialX", 350);
+        obj8.put("initialY", 150);
+        obj8.put("cols", 1);
+        obj8.put("rows", 3);
+        selectableObjects2.put(name8, obj8);
+        initialSelectableObjects2.put("O8", obj8);
+
+        String name9 = "O9";
+        JSONObject obj9 = new JSONObject();
+        obj9.put("objectId", name9);
+        obj9.put("x", 400);
+        obj9.put("y", 150);
+        obj9.put("initialX", 400);
+        obj9.put("initialY", 150);
+        obj9.put("cols", 1);
+        obj9.put("rows", 5);
+        selectableObjects2.put(name9, obj9);
+        initialSelectableObjects2.put("O9", obj9);
 
         try {
             while (true) {

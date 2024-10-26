@@ -30,6 +30,8 @@ public class CtrlPlay implements Initializable {
 
     public static Map<String, JSONObject> selectableObjects = new HashMap<>();
     private String selectedObject = "";
+    public static Map<String, JSONObject> selectableObjects2 = new HashMap<>();
+    private String selectedObject2 = "";
 
     @Override
     public void initialize(URL url, ResourceBundle rb) {
@@ -98,23 +100,47 @@ public class CtrlPlay implements Initializable {
         }
     }
 
-    private void onMousePressed(MouseEvent event) {
+    private int initialX, initialY;
 
+    private void onMousePressed(MouseEvent event) {
         double mouseX = event.getX();
         double mouseY = event.getY();
-
+    
         selectedObject = "";
+        selectedObject2 = "";
         mouseDragging = false;
-
+    
+        // Iterar sobre selectableObjects
         for (String objectId : selectableObjects.keySet()) {
             JSONObject obj = selectableObjects.get(objectId);
             int objX = obj.getInt("x");
             int objY = obj.getInt("y");
             int cols = obj.getInt("cols");
             int rows = obj.getInt("rows");
-
-            if (isPositionInsideObject(mouseX, mouseY, objX, objY,  cols, rows)) {
+            initialX = obj.getInt("initialX");
+            initialY = obj.getInt("initialY");
+    
+            if (isPositionInsideObject(mouseX, mouseY, objX, objY, cols, rows)) {
                 selectedObject = objectId;
+                mouseDragging = true;
+                mouseOffsetX = event.getX() - objX;
+                mouseOffsetY = event.getY() - objY;
+                break;
+            }
+        }
+    
+        // Iterar sobre selectableObjects2
+        for (String objectId : selectableObjects2.keySet()) {
+            JSONObject obj = selectableObjects2.get(objectId);
+            int objX = obj.getInt("x");
+            int objY = obj.getInt("y");
+            int cols = obj.getInt("cols");
+            int rows = obj.getInt("rows");
+            initialX = obj.getInt("initialX");
+            initialY = obj.getInt("initialY");
+    
+            if (isPositionInsideObject(mouseX, mouseY, objX, objY, cols, rows)) {
+                selectedObject2 = objectId;
                 mouseDragging = true;
                 mouseOffsetX = event.getX() - objX;
                 mouseOffsetY = event.getY() - objY;
@@ -125,21 +151,40 @@ public class CtrlPlay implements Initializable {
 
     private void onMouseDragged(MouseEvent event) {
         if (mouseDragging) {
-            JSONObject obj = selectableObjects.get(selectedObject);
-            double objX = event.getX() - mouseOffsetX;
-            double objY = event.getY() - mouseOffsetY;
-            
-            obj.put("x", objX);
-            obj.put("y", objY);
-            obj.put("col", grid.getCol(objX));
-            obj.put("row", grid.getRow(objY));
-
-            JSONObject msgObj = selectableObjects.get(selectedObject);
-            msgObj.put("type", "clientSelectableObjectMoving");
-            msgObj.put("objectId", obj.getString("objectId"));
-        
-            if (Main.wsClient != null) {
-                Main.wsClient.safeSend(msgObj.toString());
+            if (!selectedObject.isEmpty()) {
+                JSONObject obj = selectableObjects.get(selectedObject);
+                double objX = event.getX() - mouseOffsetX;
+                double objY = event.getY() - mouseOffsetY;
+    
+                obj.put("x", objX);
+                obj.put("y", objY);
+                obj.put("col", grid.getCol(objX));
+                obj.put("row", grid.getRow(objY));
+    
+                JSONObject msgObj = selectableObjects.get(selectedObject);
+                msgObj.put("type", "clientSelectableObjectMoving");
+                msgObj.put("objectId", obj.getString("objectId"));
+    
+                if (Main.wsClient != null) {
+                    Main.wsClient.safeSend(msgObj.toString());
+                }
+            } else if (!selectedObject2.isEmpty()) {
+                JSONObject obj = selectableObjects2.get(selectedObject2);
+                double objX = event.getX() - mouseOffsetX;
+                double objY = event.getY() - mouseOffsetY;
+    
+                obj.put("x", objX);
+                obj.put("y", objY);
+                obj.put("col", grid.getCol(objX));
+                obj.put("row", grid.getRow(objY));
+    
+                JSONObject msgObj = selectableObjects2.get(selectedObject2);
+                msgObj.put("type", "clientSelectableObjectMoving");
+                msgObj.put("objectId", obj.getString("objectId"));
+    
+                if (Main.wsClient != null) {
+                    Main.wsClient.safeSend(msgObj.toString());
+                }
             }
         }
         setOnMouseMoved(event);
@@ -148,30 +193,20 @@ public class CtrlPlay implements Initializable {
     private void onMouseReleased(MouseEvent event) {
         if (!selectedObject.isEmpty()) {
             JSONObject obj = selectableObjects.get(selectedObject);
-            
-            // Obtener la posición actual del ratón
-            double mouseX = event.getX();
-            double mouseY = event.getY();
+            int objCol = obj.getInt("col");
+            int objRow = obj.getInt("row");
+            int cols = obj.getInt("cols");
+            int rows = obj.getInt("rows");
     
-            // Obtener la celda más cercana
-            int targetCol = grid.getCol(mouseX);
-            int targetRow = grid.getRow(mouseY);
-    
-            // Verificar si la celda objetivo está ocupada
-            if (targetCol != -1 && targetRow != -1) {
-                if (!isCellOccupied(targetCol, targetRow)) {
-                    // Actualizar la posición del objeto solo si la celda está libre
-                    obj.put("x", grid.getCellX(targetCol));
-                    obj.put("y", grid.getCellY(targetRow));
-                    obj.put("col", targetCol);
-                    obj.put("row", targetRow);
-                } else {
-                    // Si está ocupada, mantener la posición anterior del objeto
-                    System.out.println("La celda ya está ocupada.");
-                }
+            if (isCompletelyInsideGrid(objCol, objRow, cols, rows) &&
+                !isOverlapping(objCol, objRow, cols, rows, selectedObject)) {
+                obj.put("x", grid.getCellX(objCol));
+                obj.put("y", grid.getCellY(objRow));
+            } else {
+                obj.put("x", initialX);
+                obj.put("y", initialY);
             }
     
-            // Enviar la actualización del objeto
             JSONObject msgObj = selectableObjects.get(selectedObject);
             msgObj.put("type", "clientSelectableObjectMoving");
             msgObj.put("objectId", obj.getString("objectId"));
@@ -182,19 +217,75 @@ public class CtrlPlay implements Initializable {
     
             mouseDragging = false;
             selectedObject = "";
-        }
-    }
-    private boolean isCellOccupied(int col, int row) {
-        for (JSONObject obj : selectableObjects.values()) {
+        } else if (!selectedObject2.isEmpty()) {
+            JSONObject obj = selectableObjects2.get(selectedObject2);
             int objCol = obj.getInt("col");
             int objRow = obj.getInt("row");
+            int cols = obj.getInt("cols");
+            int rows = obj.getInt("rows");
     
-            if (objCol == col && objRow == row) {
-                return true; // La celda está ocupada
+            if (isCompletelyInsideGrid(objCol, objRow, cols, rows) &&
+                !isOverlapping(objCol, objRow, cols, rows, selectedObject2)) {
+                obj.put("x", grid.getCellX(objCol));
+                obj.put("y", grid.getCellY(objRow));
+            } else {
+                obj.put("x", initialX);
+                obj.put("y", initialY);
+            }
+    
+            JSONObject msgObj = selectableObjects2.get(selectedObject2);
+            msgObj.put("type", "clientSelectableObjectMoving");
+            msgObj.put("objectId", obj.getString("objectId"));
+    
+            if (Main.wsClient != null) {
+                Main.wsClient.safeSend(msgObj.toString());
+            }
+    
+            mouseDragging = false;
+            selectedObject2 = "";
+        }
+    }
+    
+    private boolean isCompletelyInsideGrid(int startCol, int startRow, int cols, int rows) {
+        // Verifica si el barco está completamente dentro de los límites del grid
+        return startCol >= 0 && startRow >= 0 &&
+               (startCol + cols) <= grid.getCols() &&
+               (startRow + rows) <= grid.getRows();
+    }
+    
+    
+    // Método para verificar la superposición
+    private boolean isOverlapping(int startCol, int startRow, int cols, int rows, String currentObjectId) {
+        for (String objectId : selectableObjects.keySet()) {
+            if (!objectId.equals(currentObjectId)) {
+                JSONObject otherObj = selectableObjects.get(objectId);
+                
+                // Verificar que 'col' y 'row' existan en el objeto
+                if (!otherObj.has("col") || !otherObj.has("row")) {
+                    continue; // Saltar este objeto si no tiene coordenadas válidas
+                }
+    
+                int otherCol = otherObj.getInt("col");
+                int otherRow = otherObj.getInt("row");
+                int otherCols = otherObj.getInt("cols");
+                int otherRows = otherObj.getInt("rows");
+    
+                // Verificar si alguna de las celdas del barco actual se solapa con las del otro barco
+                for (int col = startCol; col < startCol + cols; col++) {
+                    for (int row = startRow; row < startRow + rows; row++) {
+                        if (col >= otherCol && col < otherCol + otherCols &&
+                            row >= otherRow && row < otherRow + otherRows) {
+                            return true; // Hay superposición
+                        }
+                    }
+                }
             }
         }
-        return false; // La celda está libre
+        return false;
     }
+    
+    
+    
         
 
     public void setPlayersMousePositions(JSONObject positions) {
@@ -264,11 +355,24 @@ public class CtrlPlay implements Initializable {
         // Draw grid
         drawGrid();
 
-        // Draw selectable objects
-        for (String objectId : selectableObjects.keySet()) {
-            JSONObject selectableObject = selectableObjects.get(objectId);
-            drawSelectableObject(objectId, selectableObject);
+        for (String clientId : clientMousePositions.keySet()) {
+        JSONObject position = clientMousePositions.get(clientId);
+        if ("A".equals(clientId)) {
+            // Draw selectable objects
+            for (String objectId : selectableObjects.keySet()) {
+                JSONObject selectableObject = selectableObjects.get(objectId);
+                drawSelectableObject(objectId, selectableObject);
+            }
+        } else {
+            // Draw selectable objects
+            for (String objectId : selectableObjects2.keySet()) {
+                JSONObject selectableObject = selectableObjects2.get(objectId);
+                drawSelectableObject(objectId, selectableObject);
+            }
         }
+    }
+
+
 
         // Draw mouse circles
         for (String clientId : clientMousePositions.keySet()) {

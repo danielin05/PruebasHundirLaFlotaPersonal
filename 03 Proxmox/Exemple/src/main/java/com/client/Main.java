@@ -102,20 +102,24 @@ public class Main extends Application {
     }
    
     private static void wsMessage(String response) {
-        // System.out.println(response);
         JSONObject msgObj = new JSONObject(response);
         switch (msgObj.getString("type")) {
             case "clients":
-                if (clientId == "") {
+                if (clientId.equals("")) {
                     clientId = msgObj.getString("id");
                 }
-                if (UtilsViews.getActiveView() != "ViewWait") {
+                if (!UtilsViews.getActiveView().equals("ViewWait")) {
                     UtilsViews.setViewAnimating("ViewWait");
                 }
                 List<String> stringList = jsonArrayToList(msgObj.getJSONArray("list"), String.class);
-                if (stringList.size() > 0) { ctrlWait.txtPlayer0.setText(stringList.get(0)); }
-                if (stringList.size() > 1) { ctrlWait.txtPlayer1.setText(stringList.get(1)); }
+                if (stringList.size() > 0) {
+                    ctrlWait.txtPlayer0.setText(stringList.get(0));
+                }
+                if (stringList.size() > 1) {
+                    ctrlWait.txtPlayer1.setText(stringList.get(1));
+                }
                 break;
+    
             case "countdown":
                 int value = msgObj.getInt("value");
                 String txt = String.valueOf(value);
@@ -125,11 +129,16 @@ public class Main extends Application {
                 }
                 ctrlWait.txtTitle.setText(txt);
                 break;
+    
             case "serverMouseMoving":
                 ctrlPlay.setPlayersMousePositions(msgObj.getJSONObject("positions"));
                 break;
+    
             case "serverSelectableObjects":
-                ctrlPlay.setSelectableObjects(msgObj.getJSONObject("selectableObjects"));
+                // Solo establecer los barcos correspondientes a este cliente
+                if (msgObj.has("selectableObjects")) {
+                    ctrlPlay.setSelectableObjects(msgObj.getJSONObject("selectableObjects"));
+                }
                 break;
         }
     }
